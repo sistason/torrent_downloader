@@ -17,7 +17,11 @@ class TorrentDownloader:
         self.premiumize_me_api = PremiumizeMeAPI(auth, event_loop=self.event_loop)
 
     async def download(self, search):
-        torrent = self.grabber.get_torrent(search)
+        if search.startswith('http') or search.startswith('magnet:?'):
+            torrent = PirateBayResult(None)
+            torrent.magnet = search
+        else:
+            torrent = self.grabber.get_torrent(search)
         if not torrent:
             return
 
@@ -64,17 +68,18 @@ class PirateBayResult:
     def __init__(self, beautiful_soup_tag):
         self.title = self.magnet = ''
         self.seeders = self.leechers = 0
-        try:
-            tds = beautiful_soup_tag.find_all('td')
-            self.title = tds[1].a.text
-            self.magnet = tds[1].find_all('a')[1].attrs.get('href')
-            self.seeders = int(tds[-2].text)
-            self.leechers = int(tds[-1].text)
-        except (IndexError, ValueError, AttributeError):
-            return
+        if beautiful_soup_tag is not None:
+            try:
+                tds = beautiful_soup_tag.find_all('td')
+                self.title = tds[1].a.text
+                self.magnet = tds[1].find_all('a')[1].attrs.get('href')
+                self.seeders = int(tds[-2].text)
+                self.leechers = int(tds[-1].text)
+            except (IndexError, ValueError, AttributeError):
+                return
 
     def __bool__(self):
-        return bool(self.title)
+        return bool(self.title or self.magnet)
 
 
 class PirateBayTorrentGrabber:
@@ -149,7 +154,7 @@ if __name__ == '__main__':
 
     argparser = argparse.ArgumentParser(description="Search and download from piratebay via premiumize.me")
     argparser.add_argument('search', type=str, help='Search string')
-    argparser.add_argument('download_directory', type=argcheck_dir, default='.',
+    argparser.add_argument('download_directory', type=argcheck_dir, default='.', nargs='?',
                            help='Set the directory to download the file into.')
     argparser.add_argument('-a', '--auth', type=str,
                            help="Either 'user:password' or a path to a pw-file with that format (for premiumize.me)")
