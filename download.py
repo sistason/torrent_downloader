@@ -10,12 +10,11 @@ from premiumize_me_dl.premiumize_me_api import PremiumizeMeAPI
 
 
 class TorrentDownloader:
-    def __init__(self, download_directory, auth):
+    def __init__(self, download_directory, auth, event_loop=None):
         self.download_directory = download_directory
-        self.event_loop = asyncio.get_event_loop()
 
         self.grabber = PirateBayTorrentGrabber()
-        self.premiumize_me_api = PremiumizeMeAPI(auth, event_loop=self.event_loop)
+        self.premiumize_me_api = PremiumizeMeAPI(auth, event_loop=event_loop)
 
     async def download(self, search):
         if search.startswith('http') or search.startswith('magnet:?'):
@@ -141,11 +140,11 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(message)s',
                         level=logging.WARN if args.quiet else logging.INFO)
 
-    td = TorrentDownloader(args.download_directory, args.auth)
-    event_loop = asyncio.get_event_loop()
+    event_loop_ = asyncio.get_event_loop()
+    td = TorrentDownloader(args.download_directory, args.auth, event_loop_)
     try:
-        event_loop.run_until_complete(td.download(args.search))
+        event_loop_.run_until_complete(td.download(args.search))
     except KeyboardInterrupt:
         pass
     finally:
-        event_loop.run_until_complete(td.premiumize_me_api.close())
+        event_loop_.run_until_complete(td.premiumize_me_api.close())
