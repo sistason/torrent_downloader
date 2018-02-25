@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import os
 import bs4
 import time
@@ -26,42 +27,17 @@ class TorrentDownloader:
             return
 
         logging.info('Uploading torrent {}...'.format(torrent.title))
-        upload_ = await self.premiumize_me_api.upload(torrent)
-        if not upload_:
-            return
-
-        transfer = await self._wait_for_torrent(upload_)
+        transfer = await self.premiumize_me_api.upload(torrent)
         if not transfer:
             return
 
-        await self._download_torrent(transfer)
-
-    async def _wait_for_torrent(self, upload_):
-        logging.info('Waiting for premiumize.me to finish downloading the torrent...')
-        transfer = None
-        while transfer is None or transfer.is_running() and transfer.status != 'error':
-            time.sleep(2)
-            transfer = await self._get_transfer_status(upload_)
-            logging.info('  Status: {}'.format(transfer.status_msg()))
-        return transfer
-
-    async def _get_transfer_status(self, upload_):
-        transfers = await self.premiumize_me_api.get_transfers()
-
-        for transfer in transfers:
-            if transfer.id == upload_.id:
-                return transfer
-
-    async def _download_torrent(self, transfer):
         logging.info('Downloading {}...'.format(transfer.name))
-        file_ = await self.premiumize_me_api.get_file_from_transfer(transfer)
-        if file_:
-            success = await self.premiumize_me_api.download_file(file_, self.download_directory)
-            if success:
-                logging.info('Success! Deleting torrent...')
-                await self.premiumize_me_api.delete(file_)
-                return success
-            logging.error('Error! Could not download torrent, was {}'.format(success))
+        success = await self.premiumize_me_api.download_transfer(transfer, self.download_directory)
+        if success:
+            logging.info('Success! Deleting torrent...')
+            await self.premiumize_me_api.delete(transfer, deep=True)
+            return success
+        logging.error('Error! Could not download torrent, was {}'.format(success))
 
 
 class PirateBayResult:
@@ -108,7 +84,7 @@ class PirateBayTorrentGrabber:
                 if ret.status_code == 200:
                     return ret.text
                 else:
-                    logging.warning('Piratebay returned status "{}", parser corrupt?'.format(ret.status_code))
+                    logging.warning('Piratebay returned status "{}", site problems?'.format(ret.status_code))
             except (requests.Timeout, requests.ConnectionError):
                 time.sleep(1)
             except Exception as e:
@@ -168,9 +144,8 @@ if __name__ == '__main__':
     td = TorrentDownloader(args.download_directory, args.auth)
     event_loop = asyncio.get_event_loop()
     try:
-        td.event_loop.run_until_complete(td.download(args.search))
+        event_loop.run_until_complete(td.download(args.search))
     except KeyboardInterrupt:
         pass
     finally:
-        td.premiumize_me_api.close()
-        td.event_loop.close()
+        event_loop.run_until_complete(td.premiumize_me_api.close())
