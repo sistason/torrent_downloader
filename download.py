@@ -41,7 +41,7 @@ class TorrentDownloader:
 
 class PirateBayResult:
     def __init__(self, beautiful_soup_tag):
-        self.title = self.magnet = ''
+        self.title = self.magnet = self.size = ''
         self.seeders = self.leechers = 0
         if beautiful_soup_tag is not None:
             try:
@@ -50,6 +50,8 @@ class PirateBayResult:
                 self.magnet = tds[1].find_all('a')[1].attrs.get('href')
                 self.seeders = int(tds[-2].text)
                 self.leechers = int(tds[-1].text)
+                description = tds[1].find_all('font', attrs={'class': "detDesc"})[0].text
+                self.size = description.split(',')[1][6:]
             except (IndexError, ValueError, AttributeError):
                 return
 
@@ -101,10 +103,10 @@ class PirateBayTorrentGrabber:
             # quiet mote, select torrent with most leechers (popularity)
             return sorted_results[0]
         else:
-            logging.info('ID: L  |  S  -     Title')
+            logging.info('ID:    S  |    Size    |     Title')
             for i, result in enumerate(sorted_results):
-                result_formatted = 'L{r.leechers:4}|S{r.seeders:4} - {r.title}'.format(r=result)
-                logging.info('{:2}: {}'.format(i, result_formatted))
+                result_formatted = '{r.seeders:4} | {r.size:>10} | {r.title}'.format(r=result)
+                logging.info('{:2}:  {}'.format(i, result_formatted))
             index = input('Select Torrent to download: ')
             if not index.isdigit() or int(index) < 0 or int(index) >= len(results):
                 logging.warning('Selected nothing, exiting...')
