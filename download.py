@@ -34,7 +34,7 @@ class TorrentDownloader:
         success = await self.premiumize_me_api.download_transfer(transfer, self.download_directory)
         if success:
             logging.info('Success! Deleting torrent...')
-            await self.premiumize_me_api.delete(transfer, deep=True)
+            await self.premiumize_me_api.delete(transfer)
             return success
         logging.error('Error! Could not download torrent, was {}'.format(success))
 
