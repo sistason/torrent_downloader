@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import re
 import bs4
 import time
 import logging
@@ -18,13 +19,17 @@ class TorrentDownloader:
 
     async def download(self, search):
         if search.startswith('http') or search.startswith('magnet:?'):
-            torrent = PirateBayResult(None)
-            torrent.magnet = search
+            torrents = [PirateBayResult(None)]
+            torrents[0].magnet = search
         else:
-            torrent = self.grabber.get_torrent(search)
-        if not torrent:
+            torrents = self.grabber.get_torrents(search)
+        if not torrents:
             return
 
+        tasks = asyncio.gather(*[self._download_torrent(torrent) for torrent in torrents])
+        await tasks
+
+    async def _download_torrent(self, torrent):
         logging.info('Uploading torrent {}...'.format(torrent.title))
         transfer = await self.premiumize_me_api.upload(torrent)
         if not transfer:
@@ -62,10 +67,10 @@ class PirateBayResult:
 class PirateBayTorrentGrabber:
     url = 'https://thepiratebay.org'
 
-    def get_torrent(self, search):
+    def get_torrents(self, search):
         results = self._get_search_results(search)
         logging.info('Fount {} torrents, selecting...'.format(len(results)))
-        return self._select_search_result(results)
+        return self._select_search_results(results)
 
     def _get_search_results(self, search):
         logging.info('Searching piratebay for "{}"'.format(search))
@@ -95,7 +100,7 @@ class PirateBayTorrentGrabber:
         logging.warning('Connection to Piratebay failed. Site down?')
 
     @staticmethod
-    def _select_search_result(results):
+    def _select_search_results(results):
         sorted_results = sorted(results, key=lambda f: f.leechers, reverse=True)
         if not sorted_results:
             return
@@ -107,11 +112,14 @@ class PirateBayTorrentGrabber:
             for i, result in enumerate(sorted_results):
                 result_formatted = '{r.seeders:4} | {r.size:>10} | {r.title}'.format(r=result)
                 logging.info('{:2}:  {}'.format(i, result_formatted))
-            index = input('Select Torrent to download: ')
-            if not index.isdigit() or int(index) < 0 or int(index) >= len(results):
-                logging.warning('Selected nothing, exiting...')
-                return
-            return sorted_results[int(index)]
+            indices = re.split(r'\D', input('Select Torrent to download: '))
+            selected_results = []
+            for index in indices:
+                if not index.isdigit() or int(index) < 0 or int(index) >= len(results):
+                    logging.warning('Selected nothing, exiting...')
+                    continue
+                selected_results.append(sorted_results[int(index)])
+            return selected_results
 
 
 if __name__ == '__main__':
