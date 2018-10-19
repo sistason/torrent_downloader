@@ -3,6 +3,7 @@ import os
 import re
 import bs4
 import time
+import random
 import logging
 import asyncio
 import requests
@@ -65,7 +66,14 @@ class PirateBayResult:
 
 
 class PirateBayTorrentGrabber:
-    url = 'https://thepiratebay.org'
+    PROXIES = ['https://thepiratebay.org',
+               'https://pirateproxy.gdn',
+               'https://theproxybay.net',
+               'https://thepiratebay.vip',
+               'https://bayfortaiwan.online',
+               'https://thepiratebay.vin',
+               'https://thepiratebay-org.prox.fun',
+               'https://thepiratebay.online']
 
     def get_torrents(self, search):
         results = self._get_search_results(search)
@@ -73,31 +81,33 @@ class PirateBayTorrentGrabber:
         return self._select_search_results(results)
 
     def _get_search_results(self, search):
-        logging.info('Searching piratebay for "{}"'.format(search))
-        response = self._make_request(self.url + '/search/{}/0/99/0'.format(search))
-        if response:
-            bs4_response = bs4.BeautifulSoup(response, "lxml")
-            main_table = bs4_response.find('table', attrs={'id': 'searchResult'})
-            if main_table:
-                return [PirateBayResult(tag) for tag in main_table.find_all('tr')[1:]]
+        random.shuffle(self.PROXIES)
+        for proxy_url in self.PROXIES:
+            logging.info('Searching {} for "{}"'.format(proxy_url, search))
+            response = self._make_request(proxy_url + '/search/{}/0/99/0'.format(search), timeout=2, retry=2)
+            if response:
+                bs4_response = bs4.BeautifulSoup(response, "lxml")
+                main_table = bs4_response.find('table', attrs={'id': 'searchResult'})
+                if main_table:
+                    return [PirateBayResult(tag) for tag in main_table.find_all('tr')[1:]]
         return []
 
     @staticmethod
-    def _make_request(url):
-        for retry in range(3):
+    def _make_request(url, retries=3, timeout=5):
+        for retry in range(retries):
             try:
-                ret = requests.post(url, timeout=5)
+                ret = requests.post(url, timeout=timeout)
                 if ret.status_code == 200:
                     return ret.text
                 else:
-                    logging.warning('Piratebay returned status "{}", site problems?'.format(ret.status_code))
+                    logging.debug('{} returned status "{}", site problems?'.format(url, ret.status_code))
             except (requests.Timeout, requests.ConnectionError):
                 time.sleep(1)
             except Exception as e:
                 logging.error(
                     'Caught Exception "{}" while making a get-request to "{}"'.format(e.__class__, url))
                 return
-        logging.warning('Connection to Piratebay failed. Site down?')
+        logging.info('Connection to "{}" failed. Site probably down'.format(url))
 
     @staticmethod
     def _select_search_results(results):
