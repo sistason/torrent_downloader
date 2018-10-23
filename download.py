@@ -84,7 +84,7 @@ class PirateBayTorrentGrabber:
         random.shuffle(self.PROXIES)
         for proxy_url in self.PROXIES:
             logging.info('Searching {} for "{}"'.format(proxy_url, search))
-            response = self._make_request(proxy_url + '/search/{}/0/99/0'.format(search), timeout=2, retry=2)
+            response = self._make_request(proxy_url + '/search/{}/0/99/0'.format(search), timeout=2, retries=2)
             if response:
                 bs4_response = bs4.BeautifulSoup(response, "lxml")
                 main_table = bs4_response.find('table', attrs={'id': 'searchResult'})
