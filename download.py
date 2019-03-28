@@ -121,7 +121,7 @@ class PirateBayTorrentGrabber:
             logging.info('ID:    S  |    Size    |     Title')
             for i, result in enumerate(sorted_results):
                 result_formatted = '{r.seeders:4} | {r.size:>10} | {r.title}'.format(r=result)
-                logging.info('{:2}:  {}'.format(i, result_formatted))
+                logging.info('{:2}:  {}'.format(i, result_formatted.replace(u'\xa0', u' ')))    #Replace &nbsp;
             indices = re.split(r'\D', input('Select Torrent to download: '))
             selected_results = []
             for index in indices:
