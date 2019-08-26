@@ -66,14 +66,16 @@ class PirateBayResult:
 
 
 class PirateBayTorrentGrabber:
-    PROXIES = ['https://thepiratebay.org',
-               'https://pirateproxy.gdn',
-               'https://theproxybay.net',
-               'https://thepiratebay.vip',
-               'https://bayfortaiwan.online',
-               'https://thepiratebay.vin',
-               'https://thepiratebay-org.prox.fun',
-               'https://thepiratebay.online']
+
+    def __init__(self):
+        self.proxies = self.setup_proxies()
+
+    def setup_proxies(self):
+        ret = requests.get("http://proxybay.one")
+        if ret.ok:
+            bs4_response = bs4.BeautifulSoup(ret.text, "lxml")
+            proxylist = bs4_response.find('table', attrs={'id': 'proxyList'})
+            return [p.td.a.attrs.get('href') for p in proxylist.find_all('tr') if p.td]
 
     def get_torrents(self, search):
         results = self._get_search_results(search)
@@ -81,8 +83,7 @@ class PirateBayTorrentGrabber:
         return self._select_search_results(results)
 
     def _get_search_results(self, search):
-        random.shuffle(self.PROXIES)
-        for proxy_url in self.PROXIES:
+        for proxy_url in self.proxies:
             logging.info('Searching {} for "{}"'.format(proxy_url, search))
             response = self._make_request(proxy_url + '/search/{}/0/99/0'.format(search), timeout=2, retries=2)
             if response:
