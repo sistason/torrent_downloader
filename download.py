@@ -18,12 +18,12 @@ class TorrentDownloader:
         self.grabber = PirateBayTorrentGrabber()
         self.premiumize_me_api = PremiumizeMeAPI(auth, event_loop=event_loop)
 
-    async def download(self, search):
+    async def download(self, search, type_=None):
         if search.startswith('http') or search.startswith('magnet:?'):
             torrents = [PirateBayResult(None)]
             torrents[0].magnet = search
         else:
-            torrents = self.grabber.get_torrents(search)
+            torrents = self.grabber.get_torrents(search, type_=type_)
         if not torrents:
             return
 
@@ -66,26 +66,29 @@ class PirateBayResult:
 
 
 class PirateBayTorrentGrabber:
+    TYPE_URL = {'movie': '207', 'show': '208', 'video': '200', 'audio': '100', 'porn': '500', 'game': '400'}
 
     def __init__(self):
         self.proxies = self.setup_proxies()
 
-    def setup_proxies(self):
+    @staticmethod
+    def setup_proxies():
         ret = requests.get("http://proxybay.one")
         if ret.ok:
             bs4_response = bs4.BeautifulSoup(ret.text, "lxml")
             proxylist = bs4_response.find('table', attrs={'id': 'proxyList'})
             return [p.td.a.attrs.get('href') for p in proxylist.find_all('tr') if p.td]
 
-    def get_torrents(self, search):
-        results = self._get_search_results(search)
+    def get_torrents(self, search, type_=None):
+        results = self._get_search_results(search, type_=type_)
         logging.info('Fount {} torrents, selecting...'.format(len(results)))
         return self._select_search_results(results)
 
-    def _get_search_results(self, search):
+    def _get_search_results(self, search, type_=None):
+        type_ = self.TYPE_URL.get(type_) if type_ else '0'
         for proxy_url in self.proxies:
             logging.info('Searching {} for "{}"'.format(proxy_url, search))
-            response = self._make_request(proxy_url + '/search/{}/0/99/0'.format(search), timeout=2, retries=2)
+            response = self._make_request(proxy_url + '/search/{}/0/99/{}'.format(search, type_), timeout=2, retries=2)
             if response:
                 bs4_response = bs4.BeautifulSoup(response, "lxml")
                 main_table = bs4_response.find('table', attrs={'id': 'searchResult'})
@@ -154,6 +157,8 @@ if __name__ == '__main__':
                            help='Set the directory to download the file into.')
     argparser.add_argument('-a', '--auth', type=str,
                            help="Either 'user:password' or a path to a pw-file with that format (for premiumize.me)")
+    argparser.add_argument('-t', '--type', type=str,
+                           help="Either video, show, movie, porn, audio, game")
     argparser.add_argument('-q', '--quiet', action='store_true')
 
     args = argparser.parse_args()
@@ -164,7 +169,7 @@ if __name__ == '__main__':
     event_loop_ = asyncio.get_event_loop()
     td = TorrentDownloader(args.download_directory, args.auth, event_loop_)
     try:
-        event_loop_.run_until_complete(td.download(args.search))
+        event_loop_.run_until_complete(td.download(args.search, type_=args.type))
     except KeyboardInterrupt:
         pass
     finally:
