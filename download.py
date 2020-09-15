@@ -7,6 +7,7 @@ import random
 import logging
 import asyncio
 import requests
+from simplejson.errors import JSONDecodeError
 
 from premiumize_me_dl.premiumize_me_api import PremiumizeMeAPI
 
@@ -46,7 +47,7 @@ class TorrentDownloader:
 
 
 class PirateBayResult:
-    def __init__(self, beautiful_soup_tag):
+    def __init__(self, beautiful_soup_tag=None, json_entry=None):
         self.title = self.magnet = self.size = ''
         self.seeders = self.leechers = 0
         if beautiful_soup_tag is not None:
@@ -60,6 +61,21 @@ class PirateBayResult:
                 self.size = description.split(',')[1][6:]
             except (IndexError, ValueError, AttributeError):
                 return
+
+        if json_entry is not None:
+            self.title = json_entry.get("name")
+            self.magnet = 'magnet:?xt=urn:btih:{}'.format(json_entry.get("info_hash"))
+            self.seeders = json_entry.get("seeders")
+            self.leechers = json_entry.get("leechers")
+            self.size = self.humanize(int(json_entry.get("size")))
+
+    @staticmethod
+    def humanize(num):
+        for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
+            if abs(num) < 1024.0:
+                return "%3.1f%s" % (num, unit)
+            num /= 1024.0
+        return "%.1f%sB" % (num, 'Yi')
 
     def __bool__(self):
         return bool(self.title or self.magnet)
@@ -88,12 +104,20 @@ class PirateBayTorrentGrabber:
         type_ = self.TYPE_URL.get(type_) if type_ else '0'
         for proxy_url in self.proxies:
             logging.info('Searching {} for "{}"'.format(proxy_url, search))
-            response = self._make_request(proxy_url + '/search/{}/0/99/{}'.format(search, type_), timeout=2, retries=2)
+            response = self._make_request('{}/newapi/q.php?q={}&cat={}'.format(proxy_url, search, type_),
+                                          timeout=2, retries=2)
             if response:
-                bs4_response = bs4.BeautifulSoup(response, "lxml")
-                main_table = bs4_response.find('table', attrs={'id': 'searchResult'})
-                if main_table:
-                    return [PirateBayResult(tag) for tag in main_table.find_all('tr')[1:]]
+                # Old API
+                # bs4_response = bs4.BeautifulSoup(response.text, "lxml")
+                # main_table = bs4_response.find('table', attrs={'id': 'searchResult'})
+                # if main_table:
+                #    return [PirateBayResult(beautiful_soup_tag=tag) for tag in main_table.find_all('tr')[1:]]
+
+                try:
+                    return [PirateBayResult(json_entry=entry) for entry in response.json()[:30]]
+                except JSONDecodeError:
+                    continue
+
         return []
 
     @staticmethod
@@ -102,7 +126,7 @@ class PirateBayTorrentGrabber:
             try:
                 ret = requests.post(url, timeout=timeout)
                 if ret.status_code == 200:
-                    return ret.text
+                    return ret
                 else:
                     logging.debug('{} returned status "{}", site problems?'.format(url, ret.status_code))
             except (requests.Timeout, requests.ConnectionError):
@@ -160,11 +184,12 @@ if __name__ == '__main__':
     argparser.add_argument('-t', '--type', type=str,
                            help="Either video, show, movie, porn, audio, game")
     argparser.add_argument('-q', '--quiet', action='store_true')
+    argparser.add_argument('-v', '--verbose', action='store_true')
 
     args = argparser.parse_args()
 
     logging.basicConfig(format='%(message)s',
-                        level=logging.WARN if args.quiet else logging.INFO)
+                        level=logging.WARN if args.quiet else logging.DEBUG if args.verbose else logging.INFO)
 
     event_loop_ = asyncio.get_event_loop()
     td = TorrentDownloader(args.download_directory, args.auth, event_loop_)
