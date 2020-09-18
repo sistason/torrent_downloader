@@ -114,9 +114,10 @@ class PirateBayTorrentGrabber:
                 #    return [PirateBayResult(beautiful_soup_tag=tag) for tag in main_table.find_all('tr')[1:]]
 
                 try:
-                    results = [PirateBayResult(json_entry=entry) for entry in response.json()[:30]]
-                    if results:
-                        return results
+                    results_json = response.json()[:30]
+                    if not results_json or len(results_json) == 1 and results_json[0].get("id") == "0":
+                        continue
+                    return [PirateBayResult(json_entry=entry) for entry in results_json]
                 except JSONDecodeError:
                     continue
 
