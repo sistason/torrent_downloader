@@ -16,7 +16,12 @@ setup(name='Torrent Downloader via Premiumize.me',
       packages=find_packages(),
       install_requires=[
         'click',
-        'bs4'
+        'bs4',
+        'aiohttp',
+        'aiofiles',
+        'requests',
+        'lxml',
+        'simplejson'
       ],
       entry_points={
         'console_scripts': [
