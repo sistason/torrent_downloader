@@ -20,7 +20,7 @@ def argcheck_dir(ctx, params, string):
 
 
 @click.command()
-@click.argument("search_string")
+@click.argument("search_string", nargs=-1)
 @click.option("-v", "--verbose", is_flag=True)
 @click.option("-q", "--quiet", is_flag=True)
 @click.option("-d", "--download_directory", default=".", callback=argcheck_dir,
@@ -33,8 +33,8 @@ def cli(search_string, download_directory, verbose, quiet, auth, type):
     logging.basicConfig(format='%(message)s',
                         level=logging.WARN if quiet else logging.DEBUG if verbose else logging.INFO)
 
+    search_string = ' '.join(search_string)
     event_loop_ = asyncio.get_event_loop()
-    print(auth)
     td = TorrentDownloader(download_directory, auth, event_loop_)
     try:
         event_loop_.run_until_complete(td.download(search_string, type_=type))
