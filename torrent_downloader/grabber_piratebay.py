@@ -49,15 +49,15 @@ class PirateBayTorrentGrabber:
 
     @staticmethod
     def setup_proxies():
-        ret = requests.get("http://proxybay.one")
+        ret = requests.get("https://piratebayproxy.info/")
         if ret.ok:
             bs4_response = bs4.BeautifulSoup(ret.text, "lxml")
-            proxylist = bs4_response.find('table', attrs={'id': 'proxyList'})
+            proxylist = bs4_response.find('table', attrs={'id': 'searchResult'})
             return [p.td.a.attrs.get('href') for p in proxylist.find_all('tr') if p.td]
 
     def get_torrents(self, search, type_=None):
         results = self._get_search_results(search, type_=type_)
-        logging.info('Fount {} torrents, selecting...'.format(len(results)))
+        logging.info('Found {} torrents, selecting...'.format(len(results)))
         return self._select_search_results(results)
 
     def _get_search_results(self, search, type_=None):
@@ -67,12 +67,6 @@ class PirateBayTorrentGrabber:
             response = self._make_request('{}/newapi/q.php?q={}&cat={}'.format(proxy_url, search, type_),
                                           timeout=2, retries=2)
             if response:
-                # Old API
-                # bs4_response = bs4.BeautifulSoup(response.text, "lxml")
-                # main_table = bs4_response.find('table', attrs={'id': 'searchResult'})
-                # if main_table:
-                #    return [PirateBayResult(beautiful_soup_tag=tag) for tag in main_table.find_all('tr')[1:]]
-
                 try:
                     results_json = response.json()[:30]
                     if not results_json or len(results_json) == 1 and results_json[0].get("id") == "0":
@@ -80,6 +74,15 @@ class PirateBayTorrentGrabber:
                     return [PirateBayResult(json_entry=entry) for entry in results_json]
                 except JSONDecodeError:
                     continue
+            else:
+                response = self._make_request('{}/s/?q={}&cat={}'.format(proxy_url, search, type_),
+                                              timeout=2, retries=2)
+                if response:
+                    # Old API
+                    bs4_response = bs4.BeautifulSoup(response.text, "lxml")
+                    main_table = bs4_response.find('table', attrs={'id': 'searchResult'})
+                    if main_table:
+                       return [PirateBayResult(beautiful_soup_tag=tag) for tag in main_table.find_all('tr')[1:]]
 
         return []
 

@@ -14,4 +14,12 @@ setup(name='Torrent Downloader via Premiumize.me',
         'Programming Language :: Python :: 3',
       ],
       packages=find_packages(),
+      install_requires=[
+        'click',
+      ],
+      entry_points={
+        'console_scripts': [
+            'torr_dl=torrent_downloader.cli:cli'
+        ],
+      },
       )
