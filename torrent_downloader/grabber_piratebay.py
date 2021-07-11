@@ -51,14 +51,37 @@ class PirateBayTorrentGrabber:
     def setup_proxies():
         ret = requests.get("https://piratebayproxy.info/")
         if ret.ok:
-            bs4_response = bs4.BeautifulSoup(ret.text, "lxml")
-            proxylist = bs4_response.find('table', attrs={'id': 'searchResult'})
-            return [p.td.a.attrs.get('href') for p in proxylist.find_all('tr') if p.td]
+            try:            
+                bs4_response = bs4.BeautifulSoup(ret.text, "lxml")
+                proxylist = bs4_response.find('table', attrs={'id': 'searchResult'})
+                return [p.td.a.attrs.get('href') for p in proxylist.find_all('tr') if p.td]
+            except:
+                pass
+        logging.warning("PirateBay Proxy down again. Please inform your Serverbetreiber :)")
+
 
     def get_torrents(self, search, type_=None):
         results = self._get_search_results(search, type_=type_)
         logging.info('Found {} torrents, selecting...'.format(len(results)))
         return self._select_search_results(results)
+
+    def _parse_api(self, response):
+        try:
+            results_json = response.json()[:30]
+            if not results_json or len(results_json) == 1 and results_json[0].get("id") == "0":
+                return None
+            return [PirateBayResult(json_entry=entry) for entry in results_json]
+        except JSONDecodeError:
+            return None
+
+    def _parse_site(self, response):
+        try:
+            bs4_response = bs4.BeautifulSoup(response.text, "lxml")
+            main_table = bs4_response.find('table', attrs={'id': 'searchResult'})
+            if main_table:
+                return [PirateBayResult(beautiful_soup_tag=tag) for tag in main_table.find_all('tr')[1:]]
+        except:
+            return None
 
     def _get_search_results(self, search, type_=None):
         type_ = self.TYPE_URL.get(type_) if type_ else '0'
@@ -67,23 +90,25 @@ class PirateBayTorrentGrabber:
             response = self._make_request('{}/newapi/q.php?q={}&cat={}'.format(proxy_url, search, type_),
                                           timeout=2, retries=2)
             if response:
-                try:
-                    results_json = response.json()[:30]
-                    if not results_json or len(results_json) == 1 and results_json[0].get("id") == "0":
-                        continue
-                    return [PirateBayResult(json_entry=entry) for entry in results_json]
-                except JSONDecodeError:
-                    continue
+                results = self._parse_api(response)
+                if results:
+                    return results
             else:
                 response = self._make_request('{}/s/?q={}&cat={}'.format(proxy_url, search, type_),
                                               timeout=2, retries=2)
                 if response:
-                    # Old API
-                    bs4_response = bs4.BeautifulSoup(response.text, "lxml")
-                    main_table = bs4_response.find('table', attrs={'id': 'searchResult'})
-                    if main_table:
-                       return [PirateBayResult(beautiful_soup_tag=tag) for tag in main_table.find_all('tr')[1:]]
-
+                    results = self._parse_site(response)
+                    if results:
+                        return results
+        else:
+            logging.info('Searching the original pirate bay for "{}"'.format(search))
+            response = self._make_request('https://piratebay.org/newapi/q.php?q={}&cat={}'.format(search, type_),
+                                          timeout=2, retries=2)
+            results = self._parse_api(response)
+            if results:
+                return results
+            
+        logging.warning("No site returned results, either nothing found or all sites down... :(")
         return []
 
     @staticmethod
