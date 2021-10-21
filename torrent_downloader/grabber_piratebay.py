@@ -67,11 +67,11 @@ class PirateBayTorrentGrabber:
 
     def _parse_api(self, response):
         try:
-            results_json = response.json()[:30]
+            results_json = response.json()[:30] if response else None
             if not results_json or len(results_json) == 1 and results_json[0].get("id") == "0":
                 return None
             return [PirateBayResult(json_entry=entry) for entry in results_json]
-        except JSONDecodeError:
+        except (JSONDecodeError, AttributeError):
             return None
 
     def _parse_site(self, response):
@@ -85,6 +85,7 @@ class PirateBayTorrentGrabber:
 
     def _get_search_results(self, search, type_=None):
         type_ = self.TYPE_URL.get(type_) if type_ else '0'
+        self.proxies = []
         for proxy_url in self.proxies:
             logging.info('Searching {} for "{}"'.format(proxy_url, search))
             response = self._make_request('{}/newapi/q.php?q={}&cat={}'.format(proxy_url, search, type_),
@@ -102,7 +103,7 @@ class PirateBayTorrentGrabber:
                         return results
         else:
             logging.info('Searching the original pirate bay for "{}"'.format(search))
-            response = self._make_request('https://piratebay.org/newapi/q.php?q={}&cat={}'.format(search, type_),
+            response = self._make_request('https://apibay.org/q.php?q={}&cat={}'.format(search, type_),
                                           timeout=2, retries=2)
             results = self._parse_api(response)
             if results:
