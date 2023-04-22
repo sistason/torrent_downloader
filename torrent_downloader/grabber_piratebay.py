@@ -3,7 +3,6 @@ import bs4
 import time
 import logging
 import requests
-from simplejson.errors import JSONDecodeError
 
 
 class PirateBayResult:
@@ -28,6 +27,8 @@ class PirateBayResult:
             self.seeders = json_entry.get("seeders")
             self.leechers = json_entry.get("leechers")
             self.size = self.humanize(int(json_entry.get("size")))
+
+        print(self.title, self.magnet, self.seeders, self.leechers, self.size)
 
     @staticmethod
     def humanize(num):
@@ -71,7 +72,7 @@ class PirateBayTorrentGrabber:
             if not results_json or len(results_json) == 1 and results_json[0].get("id") == "0":
                 return None
             return [PirateBayResult(json_entry=entry) for entry in results_json]
-        except (JSONDecodeError, AttributeError):
+        except (requests.compat.json.JSONDecodeError, AttributeError):
             return None
 
     def _parse_site(self, response):

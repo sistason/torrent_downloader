@@ -3,4 +3,4 @@ aiofiles
 bs4
 requests
 lxml
-simplejson
+click

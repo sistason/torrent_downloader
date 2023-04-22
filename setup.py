@@ -4,7 +4,7 @@ from distutils.core import setup
 from setuptools import find_packages
 
 setup(name='Torrent Downloader via Premiumize.me',
-      version='1.1',
+      version='1.2',
       description='Search and download from piratebay via premiumize.me',
       author='Sistason',
       url='https://github.com/sistason/torrent_downloader',
@@ -21,7 +21,6 @@ setup(name='Torrent Downloader via Premiumize.me',
         'aiofiles',
         'requests',
         'lxml',
-        'simplejson'
       ],
       entry_points={
         'console_scripts': [
