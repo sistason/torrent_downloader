@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import logging
 import asyncio
+from pathlib import Path
 
 from premiumizeme.api import PremiumizeMeAPI
 from torrent_downloader.grabber_piratebay import PirateBayResult, PirateBayTorrentGrabber
@@ -8,7 +9,7 @@ from torrent_downloader.grabber_piratebay import PirateBayResult, PirateBayTorre
 
 class TorrentDownloader:
     def __init__(self, download_directory, auth, event_loop=None):
-        self.download_directory = download_directory
+        self.download_directory = Path(download_directory)
 
         self.grabber = PirateBayTorrentGrabber()
         self.premiumize_me_api = PremiumizeMeAPI(auth, event_loop=event_loop)
